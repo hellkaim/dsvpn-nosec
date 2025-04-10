@@ -34,6 +34,7 @@ typedef struct Context_ {
     int           listen_fd;
     int           congestion;
     int           firewall_rules_set;
+    int           no_default_routes;
     Buf           client_buf;
     struct pollfd fds[3];
     uint32_t      uc_kx_st[12];
@@ -66,8 +67,8 @@ static int firewall_rules(Context *context, int set, int silent)
     if (context->firewall_rules_set == set) {
         return 0;
     }
-    if ((cmds = (set ? firewall_rules_cmds(context->is_server).set
-                     : firewall_rules_cmds(context->is_server).unset)) == NULL) {
+    if ((cmds = (set ? firewall_rules_cmds(context->is_server, context->no_default_routes).set
+                     : firewall_rules_cmds(context->is_server, context->no_default_routes).unset)) == NULL) {
         fprintf(stderr,
                 "Routing commands for that operating system have not been "
                 "added yet.\n");
@@ -300,15 +301,15 @@ static int client_connect(Context *context)
 
     context->client_buf.pos = 0;
     memset(context->client_buf.data, 0, sizeof context->client_buf.data);
-#ifndef NO_DEFAULT_ROUTES
-    if (context->wanted_ext_gw_ip == NULL && (ext_gw_ip = get_default_gw_ip()) != NULL &&
-        strcmp(ext_gw_ip, context->ext_gw_ip) != 0) {
-        printf("Gateway changed from [%s] to [%s]\n", context->ext_gw_ip, ext_gw_ip);
-        firewall_rules(context, 0, 0);
-        snprintf(context->ext_gw_ip, sizeof context->ext_gw_ip, "%s", ext_gw_ip);
-        firewall_rules(context, 1, 0);
+    if (!context->no_default_routes) {
+        if (context->wanted_ext_gw_ip == NULL && (ext_gw_ip = get_default_gw_ip()) != NULL &&
+            strcmp(ext_gw_ip, context->ext_gw_ip) != 0) {
+            printf("Gateway changed from [%s] to [%s]\n", context->ext_gw_ip, ext_gw_ip);
+            firewall_rules(context, 0, 0);
+            snprintf(context->ext_gw_ip, sizeof context->ext_gw_ip, "%s", ext_gw_ip);
+            firewall_rules(context, 1, 0);
+        }
     }
-#endif
     memset(context->uc_st, 0, sizeof context->uc_st);
     context->uc_st[context->is_server][0] ^= 1;
     context->client_fd = tcp_client(context->server_ip, context->server_port);
@@ -512,15 +513,16 @@ __attribute__((noreturn)) static void usage(void)
          "\n"
          "dsvpn\t\"server\"\n\t<key file>\n\t<vpn server ip or name>|\"auto\"\n\t<vpn "
          "server port>|\"auto\"\n\t<tun interface>|\"auto\"\n\t<local tun "
-         "ip>|\"auto\"\n\t<remote tun ip>\"auto\"\n\t<external ip>|\"auto\""
+         "ip>|\"auto\"\n\t<remote tun ip>\"auto\"\n\t<external ip>|\"auto\"\n\t[\"--no-default-routes\"]"
          "\n\n"
          "dsvpn\t\"client\"\n\t<key file>\n\t<vpn server ip or name>\n\t<vpn server "
          "port>|\"auto\"\n\t<tun interface>|\"auto\"\n\t<local tun "
-         "ip>|\"auto\"\n\t<remote tun ip>|\"auto\"\n\t<gateway ip>|\"auto\"\n\n"
+         "ip>|\"auto\"\n\t<remote tun ip>|\"auto\"\n\t<gateway ip>|\"auto\"\n\t[\"--no-default-routes\"]\n\n"
          "Example:\n\n[server]\n\tdd if=/dev/urandom of=vpn.key count=1 bs=32\t# create key\n"
          "\tbase64 < vpn.key\t\t# copy key as a string\n\tsudo ./dsvpn server vpn.key\t# listen on "
          "443\n\n[client]\n\techo ohKD...W4= | base64 --decode > vpn.key\t# paste key\n"
-         "\tsudo ./dsvpn client vpn.key 34.216.127.34\n");
+         "\tsudo ./dsvpn client vpn.key 34.216.127.34\n"
+         "\tsudo ./dsvpn client vpn.key 34.216.127.34 auto auto auto auto auto --no-default-routes\t# without default routes\n");
     exit(254);
 }
 
@@ -558,12 +560,26 @@ int main(int argc, char *argv[])
 {
     Context     context;
     const char *ext_gw_ip;
+    int         i;
 
     if (argc < 3) {
         usage();
     }
     memset(&context, 0, sizeof context);
     context.is_server = strcmp(argv[1], "server") == 0;
+    
+    // Check for --no-default-routes or noroutes anywhere in the arguments
+    for (i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--no-default-routes") == 0 || strcmp(argv[i], "noroutes") == 0) {
+            context.no_default_routes = 1;
+            // Remove this argument by shifting all following arguments
+            for (; i < argc - 1; i++) {
+                argv[i] = argv[i + 1];
+            }
+            argc--;
+            break;
+        }
+    }
     if (load_key_file(&context, argv[2]) != 0) {
         fprintf(stderr, "Unable to load the key file [%s]\n", argv[2]);
         return 1;
@@ -609,6 +625,10 @@ int main(int argc, char *argv[])
         resolve_ip(context.server_ip, sizeof context.server_ip, context.server_ip_or_name) != 0) {
         firewall_rules(&context, 0, 1);
         return 1;
+    }
+    
+    if (context.no_default_routes) {
+        printf("Running without default routes\n");
     }
     if (context.is_server) {
         if (firewall_rules(&context, 1, 0) != 0) {

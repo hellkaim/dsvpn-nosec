@@ -439,7 +439,7 @@ int shell_cmd(const char *substs[][2], const char *args_str, int silent)
     return 0;
 }
 
-Cmds firewall_rules_cmds(int is_server)
+Cmds firewall_rules_cmds(int is_server, int no_default_routes)
 {
     if (is_server) {
 #ifdef __linux__
@@ -479,56 +479,79 @@ Cmds firewall_rules_cmds(int is_server)
     } else {
 #if defined(__APPLE__) || defined(__OpenBSD__) || defined(__FreeBSD__) || \
     defined(__DragonFly__) || defined(__NetBSD__)
-        static const char *set_cmds[] =
+        static const char *set_cmds_with_routes[] =
             { "ifconfig $IF_NAME $LOCAL_TUN_IP $REMOTE_TUN_IP up",
               "ifconfig $IF_NAME inet6 $LOCAL_TUN_IP6 $REMOTE_TUN_IP6 prefixlen 128 up",
-#ifndef NO_DEFAULT_ROUTES
               "route add $EXT_IP $EXT_GW_IP",
               "route add 0/1 $REMOTE_TUN_IP",
               "route add 128/1 $REMOTE_TUN_IP",
               "route add -inet6 -blackhole 0000::/1 $REMOTE_TUN_IP6",
               "route add -inet6 -blackhole 8000::/1 $REMOTE_TUN_IP6",
-#endif
-              NULL },
-                          *unset_cmds[] = {
-#ifndef NO_DEFAULT_ROUTES
-                              "route delete $EXT_IP",
-                              "route delete 0/1",
-                              "route delete 128/1",
-                              "route delete -inet6 0000::/1",
-                              "route delete -inet6 8000::/1",
-#endif
-                              NULL
-                          };
+              NULL };
+
+        static const char *set_cmds_no_routes[] =
+            { "ifconfig $IF_NAME $LOCAL_TUN_IP $REMOTE_TUN_IP up",
+              "ifconfig $IF_NAME inet6 $LOCAL_TUN_IP6 $REMOTE_TUN_IP6 prefixlen 128 up",
+              NULL };
+
+        static const char *unset_cmds_with_routes[] = {
+              "route delete $EXT_IP",
+              "route delete 0/1",
+              "route delete 128/1",
+              "route delete -inet6 0000::/1",
+              "route delete -inet6 8000::/1",
+              NULL
+        };
+            
+        static const char *unset_cmds_no_routes[] = {
+              NULL
+        };
+            
+        const char **set_cmds = no_default_routes ? set_cmds_no_routes : set_cmds_with_routes;
+        const char **unset_cmds = no_default_routes ? unset_cmds_no_routes : unset_cmds_with_routes;
 #elif defined(__linux__)
-        static const char
-            *set_cmds[] =
+        static const char *set_cmds_with_routes[] =
                 { "sysctl net.ipv4.tcp_congestion_control=bbr",
                   "ip link set dev $IF_NAME up",
                   "iptables -t raw -I PREROUTING ! -i $IF_NAME -d $LOCAL_TUN_IP -m addrtype ! "
                   "--src-type LOCAL -j DROP",
                   "ip addr add $LOCAL_TUN_IP peer $REMOTE_TUN_IP dev $IF_NAME",
                   "ip -6 addr add $LOCAL_TUN_IP6 peer $REMOTE_TUN_IP6/96 dev $IF_NAME",
-#ifndef NO_DEFAULT_ROUTES
                   "ip route add default dev $IF_NAME table 42069",
                   "ip -6 route add default dev $IF_NAME table 42069",
                   "ip rule add not fwmark 42069 table 42069",
                   "ip -6 rule add not fwmark 42069 table 42069",
                   "ip rule add table main suppress_prefixlength 0",
                   "ip -6 rule add table main suppress_prefixlength 0",
-#endif
-                  NULL },
-            *unset_cmds[] = {
-#ifndef NO_DEFAULT_ROUTES
+                  NULL };
+                
+        static const char *set_cmds_no_routes[] =
+                { "sysctl net.ipv4.tcp_congestion_control=bbr",
+                  "ip link set dev $IF_NAME up",
+                  "iptables -t raw -I PREROUTING ! -i $IF_NAME -d $LOCAL_TUN_IP -m addrtype ! "
+                  "--src-type LOCAL -j DROP",
+                  "ip addr add $LOCAL_TUN_IP peer $REMOTE_TUN_IP dev $IF_NAME",
+                  "ip -6 addr add $LOCAL_TUN_IP6 peer $REMOTE_TUN_IP6/96 dev $IF_NAME",
+                  NULL };
+
+        static const char *unset_cmds_with_routes[] = {
                 "ip rule delete table 42069",
                 "ip -6 rule delete table 42069",
                 "ip rule delete table main suppress_prefixlength 0",
                 "ip -6 rule delete table main suppress_prefixlength 0",
-#endif
                 "iptables -t raw -D PREROUTING ! -i $IF_NAME -d $LOCAL_TUN_IP -m addrtype ! "
                 "--src-type LOCAL -j DROP",
                 NULL
             };
+            
+        static const char *unset_cmds_no_routes[] = {
+                "iptables -t raw -D PREROUTING ! -i $IF_NAME -d $LOCAL_TUN_IP -m addrtype ! "
+                "--src-type LOCAL -j DROP",
+                NULL
+            };
+            
+        const char **set_cmds = no_default_routes ? set_cmds_no_routes : set_cmds_with_routes;
+        const char **unset_cmds = no_default_routes ? unset_cmds_no_routes : unset_cmds_with_routes;
 #else
         static const char *const *set_cmds = NULL, *const *unset_cmds = NULL;
 #endif

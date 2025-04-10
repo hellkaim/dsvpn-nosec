@@ -104,11 +104,13 @@ To manually control routing without DSVPN automatically setting up routes:
 
 ```sh
 # Server with no automatic routes
-sudo ./dsvpn server vpn.key auto 1959 auto auto auto auto noroutes
+sudo ./dsvpn server vpn.key auto 1959 auto auto auto auto --no-default-routes
 
 # Client with no automatic routes
-sudo ./dsvpn client vpn.key 34.216.127.34 1959 auto auto auto auto noroutes
+sudo ./dsvpn client vpn.key 34.216.127.34 1959 auto auto auto auto --no-default-routes
 ```
+
+The legacy `noroutes` parameter is still supported for backward compatibility, but the new `--no-default-routes` flag is now the recommended approach.
 
 This allows for custom routing configurations and is particularly useful for integration with other networking tools.
 
@@ -118,10 +120,10 @@ Both options can be used together:
 
 ```sh
 # Server with no encryption and no automatic routes
-sudo ./dsvpn server vpn.key auto 1959 auto auto auto auto nocrypto noroutes
+sudo ./dsvpn server vpn.key auto 1959 auto auto auto auto nocrypto --noroutes
 
 # Client with no encryption and no automatic routes
-sudo ./dsvpn client vpn.key 34.216.127.34 1959 auto auto auto auto nocrypto noroutes
+sudo ./dsvpn client vpn.key 34.216.127.34 1959 auto auto auto auto nocrypto --noroutes
 ```
 
 When using `noroutes`, you'll need to manually configure the interface:
@@ -176,7 +178,8 @@ dsvpn   "client"
 * `<external ip>` (server only): the external IP address of the server. Can be left to `"auto"`.
 * `<gateway ip>` (client only): the internal router IP address. The first line printed by `netstat -rn` will tell you (`gateway`).
 * `nocrypto` (optional): disables encryption, useful when DSVPN is used with another secure transport.
-* `noroutes` (optional): prevents automatic route configuration, allowing manual control.
+* `noroutes` (optional, legacy): prevents automatic route configuration, allowing manual control.
+* `--noroutes` (optional): prevents automatic route configuration, allowing manual control. This can be placed anywhere in the command line arguments.
 
 If all the remaining parameters of a command would be `auto`, they don't have to be specified.
 

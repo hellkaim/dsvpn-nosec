@@ -16,7 +16,7 @@ typedef struct Cmds {
     const char *const *unset;
 } Cmds;
 
-Cmds firewall_rules_cmds(int is_server);
+Cmds firewall_rules_cmds(int is_server, int no_default_routes);
 
 int shell_cmd(const char *substs[][2], const char *args_str, int silent);
 

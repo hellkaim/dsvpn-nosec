@@ -7,6 +7,11 @@ all: dsvpn
 dsvpn: $(CFLAGS_FILE) Makefile src/vpn.c src/charm.c src/os.c include/charm.h include/vpn.h include/os.h
 	$(CC) $$(cat "$(CFLAGS_FILE)") $(OPTFLAGS) -Iinclude -o $@ src/vpn.c src/charm.c src/os.c
 	strip $@
+	
+help:
+	@echo "Usage: dsvpn [client|server] [keyfile] [options...]"
+	@echo "  Options include noroutes to disable creation of default routes"
+	@echo "  Run ./dsvpn without arguments for more detailed usage information"
 
 install: dsvpn
 	install -d $(PREFIX)/sbin

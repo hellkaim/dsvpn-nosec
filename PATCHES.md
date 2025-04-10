@@ -6,11 +6,11 @@ This repository contains patches for DSVPN that enhance its functionality for us
 
 1. **nocrypto-patch.diff**: Adds a "nocrypto" option to DSVPN that disables encryption, useful when XRay is already providing encryption.
 
-2. **noroutes-patch.diff**: Adds a "noroutes" option to DSVPN that prevents automatic route configuration for manual control.
+2. **noroutes-patch.diff**: Adds a "--no-routes" option to DSVPN that prevents automatic route configuration for manual control.
 
 3. **combined-patch.diff**: Adds both "nocrypto" and "noroutes" options to DSVPN:
    - `nocrypto`: Disables encryption to avoid double encryption when using XRay
-   - `noroutes`: Prevents automatic route configuration for manual control
+   - `--no-routes`: Prevents automatic route configuration for manual control
 
 4. **zig-update.diff**: Basic update to the build.zig file for compatibility with newer Zig versions.
 
@@ -68,11 +68,17 @@ sudo ./dsvpn client keyfile SERVER_IP 10000 tun0 10.10.0.2 10.10.0.1 auto nocryp
 ### With Both No-Crypto and No-Routes Options
 
 ```bash
-# Server
+# Server - legacy syntax
 sudo ./dsvpn server keyfile 0.0.0.0 10000 tun0 10.10.0.1 10.10.0.2 auto nocrypto noroutes
 
-# Client
+# Client - legacy syntax
 sudo ./dsvpn client keyfile SERVER_IP 10000 tun0 10.10.0.2 10.10.0.1 auto nocrypto noroutes
+
+# Server - new syntax with flag
+sudo ./dsvpn server keyfile 0.0.0.0 10000 tun0 10.10.0.1 10.10.0.2 auto nocrypto --no-default-routes
+
+# Client - new syntax with flag
+sudo ./dsvpn client keyfile SERVER_IP 10000 tun0 10.10.0.2 10.10.0.1 auto nocrypto --no-default-routes
 ```
 
 When using the `noroutes` option, you'll need to manually configure routes:
